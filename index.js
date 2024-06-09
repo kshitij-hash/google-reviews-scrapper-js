@@ -1,65 +1,80 @@
-import puppeteer from "puppeteer";
+const puppeteer = require('puppeteer')
+const express = require('express')
+const bodyParser = require('body-parser')
+const path = require('path')
 
-(async () => {
-    const browser = await puppeteer.launch({
-        headless: false,
-        defaultViewport: null
-    });
-    const page = await browser.newPage();
-    await page.goto("https://www.google.com/search?sca_esv=925f3ab5eecafe1d&sca_upv=1&cs=1&output=search&kgmid=/g/11fhqqvxlj&q=Rocket+Education+of+Science+%26+Technology&kgs=5d9d56afb785396b&shndl=30&shem=lsp,ssic&source=sh/x/kp/local/m1/1#lrd=0x390d1bcb32d0a95b:0xe370ba82d424c0d4,1,,,,", {
-        waitUntil: "networkidle2",
-    });
+const app = express();
+const PORT = 5500;
 
-    const delay = 3000;
-    let preCount = 0;
-    let postCount = 0;
-    do {
-        preCount = await getCount(page);
-        await scrollDown2(page);
-        await waitFor(delay);
-        postCount = await getCount(page);
-    } while (postCount > preCount);
-    await waitFor(delay);
+app.use(bodyParser.json());
+app.use(express.static('public'))
 
-    await page.evaluate(() => {
-        const REVIEWS = [];
-        const reviews = document.querySelectorAll('.gws-localreviews__general-reviews-block');
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'))
+})
 
-        reviews.forEach((reviewList) => {
-            reviewList.childNodes.forEach((review) => {
-                const nameClass = review.childNodes[1].firstChild.firstChild.className;
-                const reviewClass = review.childNodes[1].lastChild.firstChild.firstChild.lastChild.className;
+app.post('/scrape', async (req, res) => {
+    const { url } = req.body;
 
-                let name = review.querySelector(`.${nameClass}`).textContent;
-
-                let reviewText = review.querySelector('.review-full-text')
-
-                if (reviewText) {
-                    reviewText = reviewText.innerHTML;
-                } else if (review.querySelector(`.${reviewClass}`)) {
-                    reviewText = review.querySelector(`.${reviewClass}`).textContent;
-                } else {
-                    reviewText = 'No review text found.'
-                }
-                REVIEWS.push({ name, reviewText });
-            })
+    try {
+        const browser = await puppeteer.launch({
+            headless: false,
+            defaultViewport: null
+        });
+        const page = await browser.newPage();
+        await page.goto(url, {
+            waitUntil: 'networkidle2'
         })
-        const jsonStr = JSON.stringify(REVIEWS, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
 
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'reviews.json';
+        const delay = 3000;
+        let preCount = 0;
+        let postCount = 0;
 
-        a.click();
+        do {
+            preCount = await getCount(page);
+            await scrollDown2(page);
+            await waitFor(delay);
+            postCount = await getCount(page);
+        } while (postCount > preCount);
 
-        return REVIEWS;
-    })
-    await waitFor(delay * 2)
+        await waitFor(delay);
 
-    await browser.close();
-})();
+        const reviews = await page.evaluate(() => {
+            const REVIEWS = [];
+            const reviews = document.querySelectorAll('.gws-localreviews__general-reviews-block');
+
+            reviews.forEach((reviewList) => {
+                reviewList.childNodes.forEach((review) => {
+                    const nameClass = review.childNodes[1].firstChild.firstChild.className;
+                    const reviewClass = review.childNodes[1].lastChild.firstChild.firstChild.lastChild.className;
+
+                    let name = review.querySelector(`.${nameClass}`).textContent;
+
+                    let reviewText = review.querySelector('.review-full-text')
+
+                    if (reviewText) {
+                        reviewText = reviewText.innerHTML;
+                    } else if (review.querySelector(`.${reviewClass}`)) {
+                        reviewText = review.querySelector(`.${reviewClass}`).textContent;
+                    } else {
+                        reviewText = 'No review text found.'
+                    }
+                    REVIEWS.push({ name, reviewText });
+                })
+            });
+            return REVIEWS;
+        });
+        await browser.close();
+        res.json(reviews);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('An error occurred. Please try again later.');
+    }
+})
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`)
+})
 
 async function getCount(page) {
     return await page.$$eval(".gws-localreviews__general-reviews-block", (a) => a.length);

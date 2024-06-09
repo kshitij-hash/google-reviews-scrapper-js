@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Scraper</title>
+</head>
+
+<body>
+    <h1>Review Scraper</h1>
+    <form id="scrape-form">
+        <label for="url">Enter URL:</label>
+        <input type="text" id="url" name="url" required>
+        <button type="submit">Scrape Reviews</button>
+    </form>
+    <div id="error-message" style="color: red; display: none;"></div>
+    <script>
+        document.getElementById('scrape-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const url = document.getElementById('url').value;
+            const errorMessage = document.getElementById('error-message');
+
+            const urlPattern = /https:\/\/www\.google\.com\/search\?./;
+            if (!urlPattern.test(url)) {
+                errorMessage.textContent = 'Please enter a valid Google search URL with the review dialog open.';
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            errorMessage.style.display = 'none';
+            const response = await fetch('/scrape', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url })
+            });
+
+            if (response.ok) {
+                const reviews = await response.json();
+                const blob = new Blob([JSON.stringify(reviews, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'reviews.json';
+                link.click();
+
+                document.getElementById('url').value = '';
+            } else {
+                alert('An error occurred while processing your request.');
+            }
+        });
+    </script>
+</body>
+
+</html>
