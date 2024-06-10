@@ -1,6 +1,8 @@
 # Google Reviews Scrapper js
 This is a simple Google Reviews Scrapper using `Puppeteer` and `Node.js`. It will scrape the reviews of a Google Place and save them in a JSON file.
 
+[link to scrapper](ec2-3-89-33-160.compute-1.amazonaws.com:5500)
+
 ## Installation
 1. Clone and set up the repository on your local machine
 2. Run `npm install` to install the dependencies
